@@ -1,0 +1,56 @@
+prop-mgmt-agents-demo/
+├── .env                        # Environment variables
+├── .gitignore                  # Git ignore rules
+├── .streamlit/                 # Streamlit configuration
+│   ├── config.toml            # Streamlit theme and settings
+│   └── secrets.toml           # Streamlit secrets (not in git)
+│
+├── app/                        # Main application code
+│   ├── __init__.py
+│   ├── config.py              # Configuration and settings
+│   ├── database.py            # Database connection and operations
+│   ├── s3.py                  # S3 file handling
+│   ├── validators.py          # Input validation
+│   └── streamlit_app.py       # Main Streamlit interface
+│
+├── agent/                      # AI agent components
+│   ├── __init__.py
+│   ├── main.py                # Main agent logic
+│   ├── tools.py               # Agent tools implementation
+│   └── crew.py                # Crew AI setup
+│
+├── utils/                      # Utility functions
+│   ├── __init__.py
+│   ├── logger.py              # Logging configuration
+│   ├── monitoring.py          # Performance monitoring
+│   └── helpers.py             # Helper functions
+│
+├── tests/                      # Test suite
+│   ├── __init__.py
+│   ├── conftest.py            # Test configurations
+│   ├── test_database.py       # Database tests
+│   ├── test_agent.py          # Agent tests
+│   └── test_api.py            # API tests
+│
+├── logs/                       # Log files (not in git)
+│   └── app.log
+│
+├── templates/                  # Email and message templates
+│   └── email/
+│       ├── request_confirmation.html
+│       ├── contractor_assignment.html
+│       └── completion_notification.html
+│
+├── docs/                       # Documentation
+│   ├── setup.md
+│   ├── api.md
+│   └── deployment.md
+│
+├── scripts/                    # Utility scripts
+│   ├── setup_db.py            # Database setup script
+│   └── generate_test_data.py  # Test data generator
+│
+├── requirements.txt            # Main dependencies
+├── requirements-test.txt       # Test dependencies
+├── Procfile                   # Deployment configuration
+└── README.md                  # Project documentation
