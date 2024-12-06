@@ -1,62 +1,79 @@
-from psycopg2.pool import SimpleConnectionPool
-from psycopg2.extras import RealDictCursor
-from functools import lru_cache
-from typing import Dict, List, Optional
+# app/database.py
+
+from app.config import Settings
+from typing import Optional, Dict, Any
+from supabase import Client, create_client
 import logging
 
-logger = logging.getLogger(__name__)
-
 class Database:
-    def __init__(self, db_config: Dict):
-        self.pool = SimpleConnectionPool(
-            minconn=1,
-            maxconn=10,
-            **db_config
-        )
+    """
+    Database interface for Supabase connections.
+    Handles all database operations with proper error handling and logging.
+    """
     
-    def get_connection(self):
-        return self.pool.getconn()
-    
-    def put_connection(self, conn):
-        self.pool.putconn(conn)
-    
-    @lru_cache(maxsize=100, ttl=300)
-    def get_properties(self) -> List[Dict]:
-        conn = self.get_connection()
+    def __init__(self, settings: Settings, supabase_client: Optional[Client] = None):
+        """
+        Initialize database interface.
+        
+        Args:
+            settings: Application configuration
+            supabase_client: Optional pre-configured Supabase client
+        """
+        self.settings = settings
+        self.supabase = supabase_client
+        self._initialized = False
+        self.logger = logging.getLogger(__name__)
+
+    async def initialize(self):
+        """
+        Initialize database connection if not already done.
+        Creates Supabase client if one wasn't provided.
+        """
+        if not self._initialized:
+            try:
+                if not self.supabase:
+                    self.supabase = create_client(
+                        self.settings.SUPABASE_URL,
+                        self.settings.SUPABASE_KEY
+                    )
+                self._initialized = True
+                self.logger.info("Database connection initialized successfully")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize database: {str(e)}")
+                raise DatabaseError("Database initialization failed")
+
+    async def fetch_one(self, query: str, *args) -> Optional[Dict[str, Any]]:
+        """
+        Execute a query and return a single row result.
+        
+        Args:
+            query: SQL query to execute
+            *args: Query parameters
+            
+        Returns:
+            Dictionary containing row data if found, None otherwise
+            
+        Raises:
+            DatabaseError: If query execution fails
+        """
         try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("""
-                    SELECT id, name, address 
-                    FROM properties 
-                    ORDER BY name
-                """)
-                return cur.fetchall()
-        finally:
-            self.put_connection(conn)
-    
-    def save_request(self, data: Dict) -> str:
-        conn = self.get_connection()
-        try:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO maintenance_requests 
-                    (id, property_id, description, contact_email, 
-                     contact_phone, photo_url, status)
-                    VALUES (%s, %s, %s, %s, %s, %s, 'new')
-                    RETURNING id
-                """, (
-                    data['id'],
-                    data['property_id'],
-                    data['description'],
-                    data['email'],
-                    data['phone'],
-                    data.get('photo_url')
-                ))
-                conn.commit()
-                return cur.fetchone()[0]
+            # Execute query through Supabase RPC
+            result = await self.supabase.rpc(
+                'execute_query',
+                {'query_text': query, 'query_params': args}
+            ).execute()
+            
+            # Return first row if exists
+            return result.data[0] if result.data else None
+            
         except Exception as e:
-            conn.rollback()
-            logger.error(f"Error saving request: {e}")
-            raise
-        finally:
-            self.put_connection(conn)
+            self.logger.error(f"Query failed: {str(e)}")
+            raise DatabaseError(f"Failed to execute query: {str(e)}")
+
+    async def close(self):
+        """
+        Clean up database resources.
+        For Supabase, this mainly resets the initialization state.
+        """
+        self._initialized = False
+        self.logger.info("Database connection closed")
