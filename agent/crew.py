@@ -83,13 +83,13 @@ class DomiCrew:
             # Initialize all required tools from our registry
             return {
                 "analysis": [
-                    get_tool("issue_classification"),
-                    get_tool("cost_estimation"),
-                    get_tool("property_lookup")
+                    MAINTENANCE_TOOLS['issue_classification'],
+                    MAINTENANCE_TOOLS['cost_estimation'],
+                    MAINTENANCE_TOOLS['property_lookup']
                 ],
                 "coordination": [
-                    get_tool("contractor_booking"),
-                    get_tool("email_notification")
+                    MAINTENANCE_TOOLS['contractor_booking'],
+                    MAINTENANCE_TOOLS['email_notification']
                 ]
             }
             
@@ -131,6 +131,24 @@ class DomiCrew:
         except Exception as e:
             logger.error(f"Agent initialization failed: {str(e)}")
             raise MaintenanceRequestError("Failed to initialize AI agents") from e
+
+
+    def __init__(self, settings: Settings):
+        """
+        Initialize the AI crew with proper configuration.
+        
+        Args:
+        settings: Application configuration settings
+    """
+        self.settings = settings
+        
+        # Ensure tools are initialized
+        if not MAINTENANCE_TOOLS:
+        initialize_tools()
+        
+    self.tools = self._initialize_tools()
+        self.agents = self._initialize_agents()
+        logger.info("DomiCrew initialized successfully")
 
     async def handle_maintenance_request(self, request: MaintenanceRequest) -> Dict[str, Any]:
         """

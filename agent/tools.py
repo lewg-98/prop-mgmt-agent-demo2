@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timedelta
 from app.database import Database
 from app.config import get_settings
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ class MaintenanceRequestError(Exception):
     pass
 
 # Base maintenance tool with shared functionality
-class BaseMaintenanceTool(BaseTool):
+class BaseMaintenanceTool(BaseTool, BaseModel):
     """Base class for maintenance tools with shared configurations"""
     
     ISSUE_CATEGORIES: ClassVar[List[str]] = ['plumbing', 'electrical', 'structural', 'appliance', 'hvac', 'other']
@@ -29,11 +29,19 @@ class BaseMaintenanceTool(BaseTool):
     settings: Any = Field(default=None)
     db: Any = Field(default=None)
     
-    def __init__(self):
+    def __init__(self, **kwargs):
         """Initialize shared components"""
-        super().__init__()
+        # Initialize settings and database first
+        super().__init__(**kwargs)  # Call parent class initialization first
         self.settings = get_settings()
         self.db = Database(self.settings)
+        
+        # Initialize BaseTool with name and description if provided
+        super().__init__(
+            name=kwargs.get('name', self.__class__.__name__.lower()),
+            description=kwargs.get('description', self.__doc__ or "No description provided"),
+            **kwargs
+        )
 
 class IssueClassificationTool(BaseMaintenanceTool):
     """Tool for classifying maintenance issues using AI"""
@@ -355,29 +363,38 @@ class CostEstimationTool(BaseMaintenanceTool):
         return round(max(0.3, min(confidence, 0.9)), 2)  # Cap between 0.3 and 0.9
 
 # Tool registry for easy access
-MAINTENANCE_TOOLS = {
-    'issue_classification': IssueClassificationTool(),
-    'contractor_booking': ContractorBookingTool(),
-    'email_notification': EmailNotificationTool(),
-    'property_lookup': PropertyLookupTool(),
-    'cost_estimation': CostEstimationTool()
-}
+MAINTENANCE_TOOLS = {}
+
+def initialize_tools():
+    """Initialize all maintenance tools with proper configuration"""
+    global MAINTENANCE_TOOLS
+    try:
+        MAINTENANCE_TOOLS = {
+            'issue_classification': IssueClassificationTool(),
+            'contractor_booking': ContractorBookingTool(),
+            'email_notification': EmailNotificationTool(),
+            'property_lookup': PropertyLookupTool(),
+            'cost_estimation': CostEstimationTool()
+        }
+        
+        # Ensure each tool is properly initialized
+        for tool in MAINTENANCE_TOOLS.values():
+            if not hasattr(tool, 'name') or not hasattr(tool, 'description'):
+                raise ValueError(f"Tool {tool.__class__.__name__} not properly initialized")
+                
+        return MAINTENANCE_TOOLS
+    except Exception as e:
+        logger.error(f"Failed to initialize tools: {str(e)}")
+        raise MaintenanceRequestError("Tool initialization failed") from e
 
 def get_tool(tool_name: str) -> BaseTool:
-    """
-    Get a specific tool instance.
-    
-    Args:
-        tool_name: Name of the tool to retrieve
-        
-    Returns:
-        Initialized tool instance
-    """
+    """Get a specific tool instance."""
     if tool_name not in MAINTENANCE_TOOLS:
         raise ValueError(f"Unknown tool: {tool_name}")
     return MAINTENANCE_TOOLS[tool_name]
 
-
+# Initialize tools when module is loaded
+initialize_tools()
 class MaintenanceTools:
     """Wrapper class for all maintenance tools"""
     def __init__(self):

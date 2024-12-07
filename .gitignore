@@ -1,14 +1,7 @@
-.env
-.streamlit/secrets.toml
-__pycache__/
-*.pyc
-.DS_Store
-venv/
-*.log
 cat > .gitignore << EOL
 # Virtual Environment
 venv/
-venvv/xx
+venvv/
 env/
 ENV/
 
