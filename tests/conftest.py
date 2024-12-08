@@ -38,14 +38,11 @@ def test_settings() -> Settings:
         AWS_SECRET_KEY="test_secret",
         AWS_REGION="us-east-1",
         S3_BUCKET="test-bucket",
-        
         OPENAI_API_KEY="test_key",
         MODEL_NAME="gpt-4-1106-preview",
-        
         APP_NAME="Domi AI Test",
         LOG_LEVEL="DEBUG",
         ENV="test"
-        
         # Remove the database settings if they're not defined in your Settings model
         # If you need these settings, add them to your Settings model first
     )
@@ -174,3 +171,19 @@ def create_test_file(temp_dir: Path, content: bytes = b"test") -> Path:
     test_file = temp_dir / "test_file.txt"
     test_file.write_bytes(content)
     return test_file
+
+@pytest.fixture
+def mock_factory():
+    """Create consistent mock objects"""
+    def _create_mock(spec, **kwargs):
+        mock = Mock(spec=spec)
+        for k, v in kwargs.items():
+            setattr(mock, k, v)
+        return mock
+    return _create_mock
+
+async def seed_test_data(db: Database, data: Dict[str, Any]):
+    """Utility for seeding test data"""
+    for table, records in data.items():
+        for record in records:
+            await db.insert(table, record)

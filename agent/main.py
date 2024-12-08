@@ -9,7 +9,7 @@ from app.config import Settings, get_settings
 from utils.logger import setup_logger
 
 # Configure logger
-logger = setup_logger("agent.main")
+logger = setup_logger("agent.main", log_file="logs/agent.log")
 
 class MaintenanceAgent:
     """

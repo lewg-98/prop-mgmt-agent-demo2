@@ -173,6 +173,19 @@ class TestDomiInterface:
             await app_interface.create_maintenance_request({})
         mock_error.assert_called_once()
 
+    async def test_session_management(self, app_interface):
+        """Test session handling"""
+        st.session_state.clear()
+        await app_interface.initialize_session()
+        assert 'authenticated' in st.session_state
+        assert 'user_role' in st.session_state
+
+    async def test_file_upload_limits(self, app_interface):
+        """Test file upload size restrictions"""
+        large_file = Mock(size=11*1024*1024)  # 11MB
+        with pytest.raises(ValueError):
+            await app_interface.validate_upload(large_file)
+
 class TestIntegration:
     """Integration tests for complete UI flow"""
 

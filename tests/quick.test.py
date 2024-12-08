@@ -85,11 +85,11 @@ async def check_configuration() -> Dict[str, bool]:
         settings = get_settings()
         
         checks = {
-            "database_url": bool(settings.DATABASE_URL),
+            "database_url": bool(settings.SUPABASE_URL),
             "openai_key": bool(settings.OPENAI_API_KEY.get_secret_value()),
-            "aws_access": bool(settings.AWS_ACCESS_KEY.get_secret_value()),
-            "aws_secret": bool(settings.AWS_SECRET_KEY.get_secret_value()),
-            "s3_bucket": bool(settings.S3_BUCKET)
+            "aws_access": bool(settings.aws.AWS_ACCESS_KEY.get_secret_value()),
+            "aws_secret": bool(settings.aws.AWS_SECRET_KEY.get_secret_value()),
+            "s3_bucket": bool(settings.aws.S3_BUCKET)
         }
         
         if all(checks.values()):
@@ -103,6 +103,21 @@ async def check_configuration() -> Dict[str, bool]:
     except Exception as e:
         logger.error(f"❌ Configuration check failed: {str(e)}")
         return {}
+
+async def check_system_resources() -> bool:
+    """Check system resource availability"""
+    try:
+        import psutil
+        memory = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent()
+        
+        if memory.percent > 90 or cpu_percent > 90:
+            logger.warning("System resources critically low")
+            return False
+        return True
+    except Exception as e:
+        logger.error(f"Resource check failed: {e}")
+        return False
 
 async def run_quick_test() -> bool:
     """Run all quick tests and return overall status"""

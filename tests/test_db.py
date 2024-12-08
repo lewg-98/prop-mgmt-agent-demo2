@@ -168,3 +168,20 @@ class TestDatabase:
         
         assert len(properties) == 0
         assert len(requests) == 0
+
+    async def test_transaction_rollback(self, test_db: Database):
+        """Test transaction rollback"""
+        async with test_db.transaction() as txn:
+            await test_db.insert("properties", property_data)
+            await txn.rollback()
+        
+        result = await test_db.fetch_one("properties", {"id": property_data["id"]})
+        assert result is None
+
+    async def test_connection_pool(self, test_db: Database):
+        """Test connection pool handling"""
+        async def concurrent_query(i: int):
+            return await test_db.fetch_one("properties", {"id": str(i)})
+        
+        results = await asyncio.gather(*[concurrent_query(i) for i in range(20)])
+        assert len(results) == 20

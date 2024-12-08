@@ -1,267 +1,225 @@
 from typing import Dict, List, Optional, Any
-from crewai import Agent, Task, Crew, Process
-from langchain.tools import BaseTool
-from pydantic import BaseModel, Field
+from datetime import datetime
 import logging
-from datetime import datetime, timedelta
 from enum import Enum
-import asyncio
+from pydantic import BaseModel, Field
+from crewai import Agent, Task, Crew, Process
+from langchain_openai import ChatOpenAI
 
-# Import our enhanced tools
 from .tools import (
-    get_tool,
     MAINTENANCE_TOOLS,
     MaintenanceRequestError
 )
 from app.config import Settings
+from utils.logger import setup_logger
 
 # Configure logging
-logger = logging.getLogger(__name__)
+logger = setup_logger("agent.crew", log_file="logs/crew.log")
 
-class RequestPriority(Enum):
-    """Maintenance request priority levels"""
-    EMERGENCY = "emergency"
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
-
-class RequestStatus(Enum):
-    """Maintenance request status states"""
+class RequestStatus(str, Enum):
+    """Simple status states for demo clarity"""
     NEW = "new"
-    ANALYZING = "analyzing"
-    COORDINATING = "coordinating"
+    PROCESSING = "processing" 
     SCHEDULED = "scheduled"
     COMPLETED = "completed"
     FAILED = "failed"
 
 class MaintenanceRequest(BaseModel):
-    """
-    Schema for maintenance request data with validation.
-    Tracks the complete lifecycle of a maintenance request.
-    """
+    """Simplified maintenance request model for MVP"""
     id: str
     property_id: str
     description: str
-    contact_email: Optional[str]
-    contact_phone: Optional[str]
-    photo_url: Optional[str]
+    contact_email: str
+    contact_phone: Optional[str] = None
+    photo_url: Optional[str] = None
     status: RequestStatus = Field(default=RequestStatus.NEW)
-    priority: Optional[RequestPriority]
+    priority: Optional[str] = None  # Simple string: urgent, high, medium, low
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    estimated_cost: Optional[float]
-    scheduled_time: Optional[datetime]
-    assigned_contractor: Optional[str]
-
-    class Config:
-        use_enum_values = True
+    scheduled_time: Optional[datetime] = None
+    assigned_contractor: Optional[str] = None
+    completion_details: Optional[Dict] = None  # Added for completion report
 
 class DomiCrew:
     """
-    AI Crew orchestrator for maintenance request handling.
-    Coordinates multiple AI agents to process maintenance requests.
+    Simplified AI Crew for maintenance request handling.
+    Focuses on core demo workflow with single agent approach.
     """
     
     def __init__(self, settings: Settings):
-        """
-        Initialize the AI crew with proper configuration.
-        
-        Args:
-            settings: Application configuration settings
-        """
+        """Initialize with minimal required components"""
         self.settings = settings
-        self.tools = self._initialize_tools()
-        self.agents = self._initialize_agents()
-        logger.info("DomiCrew initialized successfully")
+        self.llm = ChatOpenAI(
+            model="gpt-4-1106-preview",
+            temperature=0.7,
+            api_key=settings.OPENAI_API_KEY.get_secret_value()
+        )
+        self.agent = self._initialize_agent()
+        logger.info("DomiCrew initialized")
 
-    def _initialize_tools(self) -> Dict[str, BaseTool]:
-        """
-        Initialize AI tools with proper error handling.
-        Tools are specialized for different maintenance tasks.
-        """
+    def _initialize_agent(self) -> Agent:
+        """Initialize single agent with essential tools"""
         try:
-            # Initialize all required tools from our registry
-            return {
-                "analysis": [
+            return Agent(
+                role="Maintenance Manager",
+                goal="Process maintenance requests efficiently and accurately",
+                backstory="""Expert maintenance coordinator with deep knowledge of 
+                building systems and contractor management. Handles end-to-end 
+                maintenance request processing.""",
+                tools=[
                     MAINTENANCE_TOOLS['issue_classification'],
-                    MAINTENANCE_TOOLS['cost_estimation'],
-                    MAINTENANCE_TOOLS['property_lookup']
-                ],
-                "coordination": [
                     MAINTENANCE_TOOLS['contractor_booking'],
-                    MAINTENANCE_TOOLS['email_notification']
-                ]
-            }
-            
-        except Exception as e:
-            logger.error(f"Tool initialization failed: {str(e)}")
-            raise MaintenanceRequestError("Failed to initialize AI tools") from e
-
-    def _initialize_agents(self) -> Dict[str, Agent]:
-        """
-        Initialize specialized AI agents with specific roles.
-        Each agent has dedicated tools and responsibilities.
-        """
-        try:
-            agents = {
-                "analyzer": Agent(
-                    role="Maintenance Request Analyzer",
-                    goal="Analyze and prioritize maintenance requests accurately",
-                    backstory="""Expert maintenance analyst with deep knowledge of 
-                    building systems and emergency protocols. Specializes in risk 
-                    assessment and cost estimation.""",
-                    tools=self.tools["analysis"],
-                    verbose=self.settings.ENV == "development",
-                    allow_delegation=True
-                ),
-                "coordinator": Agent(
-                    role="Maintenance Coordinator",
-                    goal="Coordinate maintenance activities efficiently",
-                    backstory="""Experienced maintenance coordinator with expertise 
-                    in contractor management and emergency response. Ensures fast, 
-                    effective resolution of maintenance issues.""",
-                    tools=self.tools["coordination"],
-                    verbose=self.settings.ENV == "development",
-                    allow_delegation=True
-                )
-            }
-            logger.info("AI agents initialized successfully")
-            return agents
-            
+                    MAINTENANCE_TOOLS['notification'],
+                    MAINTENANCE_TOOLS['cost_estimation'],
+                    MAINTENANCE_TOOLS['completion_report']  # Added completion tool
+                ],
+                llm=self.llm,
+                verbose=self.settings.ENV == "development"
+            )
         except Exception as e:
             logger.error(f"Agent initialization failed: {str(e)}")
-            raise MaintenanceRequestError("Failed to initialize AI agents") from e
-
-
-    def __init__(self, settings: Settings):
-        """
-        Initialize the AI crew with proper configuration.
-        
-        Args:
-        settings: Application configuration settings
-    """
-        self.settings = settings
-        
-        # Ensure tools are initialized
-        if not MAINTENANCE_TOOLS:
-        initialize_tools()
-        
-    self.tools = self._initialize_tools()
-        self.agents = self._initialize_agents()
-        logger.info("DomiCrew initialized successfully")
+            raise MaintenanceRequestError("Setup failed - please try again")
 
     async def handle_maintenance_request(self, request: MaintenanceRequest) -> Dict[str, Any]:
         """
-        Process a maintenance request through the AI crew.
-        Coordinates analysis and resolution through specialized agents.
-        
-        Args:
-            request: Complete maintenance request details
-            
-        Returns:
-            Dictionary containing processing results and status
+        Process maintenance request with simple, linear flow.
+        Provides clear status updates for demo visualization.
         """
-        logger.info(f"Processing maintenance request {request.id}")
-        
         try:
-            # Update request status
-            request.status = RequestStatus.ANALYZING
-            
-            # Create analysis task with detailed instructions
-            analysis_task = Task(
+            # Update status
+            request.status = RequestStatus.PROCESSING
+            logger.info(f"Processing request {request.id}")
+
+            # Create maintenance task with validated categories
+            task = Task(
                 description=f"""
-                Analyze maintenance request for property {request.property_id}:
-                1. Use issue_classification tool to categorize the issue
-                2. Use property_lookup tool to get property context
-                3. Use cost_estimation tool to estimate repair costs
-                4. Determine priority and safety implications
-                
+                Handle maintenance request for property {request.property_id}:
+
                 Request Details:
                 - Description: {request.description}
-                - Photos: {request.photo_url if request.photo_url else 'None provided'}
-                
-                Provide detailed analysis in JSON format.
+                - Contact Email: {request.contact_email}
+                - Contact Phone: {request.contact_phone or 'Not provided'}
+                - Photo Available: {'Yes' if request.photo_url else 'No'}
+
+                Required Steps:
+                1. Analyze issue and classify into one of these categories:
+                   plumbing, electrical, structural, appliance, hvac, or other
+
+                2. Determine priority level:
+                   urgent, high, medium, or low
+
+                3. Use cost estimation tool to calculate repair costs based on category
+
+                4. Find and schedule appropriate contractor for the classified category
+
+                5. Send confirmation to contact email
+
+                Provide results in JSON format with:
+                - issue_type: must be one of [plumbing, electrical, structural, appliance, hvac, other]
+                - priority: must be one of [urgent, high, medium, low]
+                - estimated_cost: will be calculated based on issue_type and priority
+                - contractor_name: string
+                - scheduled_time: datetime string
+                - safety_notes: string (if applicable)
+                - next_steps: string
                 """,
-                agent=self.agents["analyzer"],
-                expected_output="JSON containing analysis results"
+                agent=self.agent
             )
 
-            # Create coordination task based on analysis
-            coordination_task = Task(
-                description=f"""
-                Coordinate maintenance resolution based on analysis results:
-                1. Use contractor_booking tool to find and book contractor
-                2. Use email_notification tool to send updates to:
-                   - Contact Email: {request.contact_email}
-                   - Contact Phone: {request.contact_phone}
-                3. Schedule work and confirm arrangements
-                4. Send confirmation notifications
-                
-                Provide coordination details in JSON format.
-                """,
-                agent=self.agents["coordinator"],
-                expected_output="JSON containing coordination results"
-            )
-
-            # Create and execute crew
+            # Execute task
             crew = Crew(
-                agents=list(self.agents.values()),
-                tasks=[analysis_task, coordination_task],
+                agents=[self.agent],
+                tasks=[task],
                 process=Process.sequential,
                 verbose=self.settings.ENV == "development"
             )
 
-            # Execute crew tasks
             result = await crew.kickoff()
-            
+
             # Update request with results
             request.status = RequestStatus.SCHEDULED
-            request.updated_at = datetime.utcnow()
-            
-            logger.info(f"Successfully processed request {request.id}")
+            request.priority = result.get('priority')
+            request.scheduled_time = result.get('scheduled_time')
+            request.assigned_contractor = result.get('contractor_name')
+
+            logger.info(f"Request {request.id} processed successfully")
             return {
                 "success": True,
                 "request_id": request.id,
                 "status": request.status,
-                "result": result,
-                "processed_at": datetime.utcnow().isoformat()
+                "priority": request.priority,
+                "contractor": request.assigned_contractor,
+                "scheduled_time": request.scheduled_time,
+                "estimated_cost": result.get('estimated_cost'),
+                "issue_type": result.get('issue_type'),
+                "next_steps": result.get('next_steps'),
+                "safety_notes": result.get('safety_notes', '')
             }
-            
+
         except Exception as e:
-            logger.error(f"Failed to process request {request.id}: {str(e)}")
+            logger.error(f"Request processing failed: {str(e)}")
             request.status = RequestStatus.FAILED
-            raise MaintenanceRequestError(f"Request processing failed: {str(e)}") from e
+            return {
+                "success": False,
+                "error": "Processing failed - please try again",
+                "details": str(e)
+            }
 
-    async def get_agent_status(self) -> Dict[str, Dict[str, Any]]:
+    async def complete_request(self, request_id: str) -> Dict[str, Any]:
         """
-        Get detailed status of all agents and their current tasks.
-        
-        Returns:
-            Dictionary containing status for each agent
+        Generate completion report for a maintenance request.
+        Uses AI to create contextual completion details.
         """
         try:
-            status = {}
-            for name, agent in self.agents.items():
-                status[name] = {
-                    "status": "active" if agent.is_available() else "busy",
-                    "last_active": datetime.utcnow().isoformat(),
-                    "current_task": agent.current_task.description if agent.current_task else None,
-                    "tools_available": [tool.name for tool in agent.tools]
+            request = await self.db.fetch_one("maintenance_requests", {"id": request_id})
+            if not request:
+                raise MaintenanceRequestError("Request not found")
+
+            # Generate completion report
+            completion_tool = MAINTENANCE_TOOLS['completion_report']
+            report = completion_tool.run(
+                description=request['description'],
+                category=request['issue_type'],
+                priority=request['priority']
+            )
+
+            if report['success']:
+                # Update request with completion details
+                request.status = RequestStatus.COMPLETED
+                request.completion_details = report['completion_report']
+                
+                # Update database
+                await self.db.update(
+                    "maintenance_requests",
+                    request_id,
+                    {
+                        "status": RequestStatus.COMPLETED,
+                        "completion_details": report['completion_report']
+                    }
+                )
+
+                return {
+                    "success": True,
+                    "request_id": request_id,
+                    "completion_details": report['completion_report']
                 }
-            return status
-        except Exception as e:
-            logger.error(f"Failed to get agent status: {str(e)}")
-            raise MaintenanceRequestError("Unable to retrieve agent status") from e
 
-    async def reset_agents(self) -> None:
-        """
-        Reset all agents to their initial state.
-        Useful for clearing any stuck tasks or states.
-        """
-        try:
-            for agent in self.agents.values():
-                agent.current_task = None
-            logger.info("Agents reset successfully")
+            raise MaintenanceRequestError("Failed to generate completion report")
+
         except Exception as e:
-            logger.error(f"Failed to reset agents: {str(e)}")
-            raise MaintenanceRequestError("Unable to reset agents") from e
+            logger.error(f"Completion failed: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    async def get_agent_status(self) -> Dict[str, Any]:
+        """Simple status check for demo monitoring"""
+        try:
+            return {
+                "status": "active" if self.agent is not None else "inactive",
+                "last_check": datetime.utcnow().isoformat(),
+                "tools_available": len(self.agent.tools)
+            }
+        except Exception as e:
+            logger.error(f"Status check failed: {str(e)}")
+            return {"status": "error", "error": str(e)}

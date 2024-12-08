@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import uuid
 from datetime import datetime
 from typing import Dict, Any
+import asyncio
 
 from agent.crew import DomiCrew, MaintenanceRequest, RequestStatus
 from agent.tools import MaintenanceTools
@@ -130,6 +131,20 @@ class TestDomiCrew:
         assert "analyzer" in status
         assert "coordinator" in status
         assert all("status" in agent for agent in status.values())
+
+    async def test_ai_timeout(self, crew: DomiCrew):
+        """Test AI operation timeout"""
+        with pytest.raises(asyncio.TimeoutError):
+            async with asyncio.timeout(1.0):
+                await crew.handle_maintenance_request(request)
+
+    async def test_rate_limiting(self, crew: DomiCrew):
+        """Test rate limiting behavior"""
+        requests = [MaintenanceRequest(**SAMPLE_REQUEST) for _ in range(10)]
+        results = await asyncio.gather(*[
+            crew.handle_maintenance_request(r) for r in requests
+        ])
+        assert len(results) == 10
 
 class TestIntegration:
     """Integration tests for complete request flow"""
