@@ -8,6 +8,8 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 import aiosmtplib
 import asyncio
+import random
+from typing import Tuple
 
 from app.database import Database
 from app.config import get_settings
@@ -39,7 +41,7 @@ class IssueClassificationTool(BaseMaintenanceTool):
     description: str = "Classify maintenance issues"
     llm: Optional[ChatOpenAI] = None
     
-    def _run(self, description: str) -> Dict[str, Any]:
+    async def _run(self, description: str) -> Dict[str, Any]:
         """Classify maintenance issue"""
         try:
             if not self.llm:
@@ -57,8 +59,9 @@ class IssueClassificationTool(BaseMaintenanceTool):
             """
             
             result = self.llm.predict(prompt)
-            return eval(result)  # Safe for MVP as we control the prompt
-            
+            classification = eval(result)
+            return classification
+        
         except Exception as e:
             logger.error(f"Classification failed: {str(e)}")
             raise MaintenanceRequestError("Unable to classify issue")
@@ -77,14 +80,17 @@ class ContractorBookingTool(BaseMaintenanceTool):
         'low': timedelta(days=5)         # Within 5 days
     }
     
-    def _run(self, category: str, priority: str) -> Dict[str, Any]:
+    async def _run(self, category: str, priority: str) -> Dict[str, Any]:
         """Simple contractor booking"""
         try:
-            # Get first available contractor for category
-            contractor = asyncio.run(self.db.fetch_one(
+            # Query matches schema: skills array and available flag
+            contractor = await self.db.fetch_one(
                 "contractors",
-                {"skills": category}
-            ))
+                {
+                    "available": True,
+                    "skills": f"@> ARRAY['{category}']"  # Postgres array contains syntax
+                }
+            )
             
             if not contractor:
                 return {"success": False, "error": "No contractor available"}
@@ -94,13 +100,11 @@ class ContractorBookingTool(BaseMaintenanceTool):
             
             return {
                 "success": True,
-                "booking": {
-                    "contractor_name": contractor['name'],
-                    "contractor_phone": contractor['phone'],
-                    "scheduled_date": scheduled_time.strftime('%Y-%m-%d'),
-                    "scheduled_time": scheduled_time.strftime('%H:%M'),
-                    "category": category
-                }
+                "contractor_id": contractor['id'],  # Changed to match assigned_contractor_id
+                "contractor_name": contractor['name'],
+                "contractor_phone": contractor['phone'],
+                "scheduled_time": scheduled_time,  # Changed to match TIMESTAMPTZ
+                "category": category
             }
             
         except Exception as e:
@@ -174,15 +178,15 @@ class CostEstimationTool(BaseMaintenanceTool):
         'other': {'base': 200, 'urgent': 300}
     }
     
-    def _run(self, category: str, priority: str) -> Dict[str, Any]:
-        """Simple cost estimation"""
+    async def _run(self, category: str, priority: str) -> Dict[str, Any]:
+        """Estimate cost to match schema decimal field"""
         try:
             costs = self.FIXED_COSTS.get(category, self.FIXED_COSTS['other'])
             estimate = costs['urgent'] if priority == 'urgent' else costs['base']
             
             return {
                 "success": True,
-                "estimate": estimate,
+                "estimate": round(float(estimate), 2),  # Ensure decimal compatibility
                 "currency": "GBP"
             }
             

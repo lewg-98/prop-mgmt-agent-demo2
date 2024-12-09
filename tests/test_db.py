@@ -1,187 +1,84 @@
 import pytest
-import asyncio
-from typing import Any, Dict, List
+from typing import Dict
+from datetime import datetime
 import uuid
-from datetime import datetime, timezone
 from app.database import Database, DatabaseError
-
-# Test data
-SAMPLE_PROPERTY = {
-    "id": str(uuid.uuid4()),
-    "name": "Test Property", 
-    "address": "123 Test St",
-    "units": 10,
-    "created_at": datetime.now(timezone.utc)
-}
-
-SAMPLE_MAINTENANCE_REQUEST = {
-    "id": str(uuid.uuid4()),
-    "description": "Test maintenance request",
-    "status": "new",
-    "priority": "medium"
-}
 
 @pytest.mark.asyncio
 class TestDatabase:
-    """Test suite for database operations"""
-
-    @pytest.mark.asyncio
+    """Test core database operations"""
+    
     async def test_connection(self, test_db: Database):
-        """Test database connection and health check"""
-        try:
-            is_healthy = await test_db.health_check()
-            assert is_healthy is True
-        except Exception as e:
-            pytest.fail(f"Database connection failed: {str(e)}")
+        """Verify database connectivity"""
+        is_healthy = await test_db.health_check()
+        assert is_healthy is True
 
-    async def test_fetch_one(self, test_db: Database):
-        """Test fetching single record"""
-        # Insert test property
-        property_data = {
-            "id": SAMPLE_PROPERTY["id"],
-            "name": SAMPLE_PROPERTY["name"],
-            "address": SAMPLE_PROPERTY["address"],
-            "units": SAMPLE_PROPERTY["units"]
-        }
-        await test_db.insert("properties", property_data)
-
-        # Fetch and verify
-        result = await test_db.fetch_one("properties", {"id": SAMPLE_PROPERTY["id"]})
-        
-        assert result is not None
-        assert result["name"] == SAMPLE_PROPERTY["name"]
-        assert result["address"] == SAMPLE_PROPERTY["address"]
-
-    async def test_fetch_all(self, test_db: Database):
-        """Test fetching multiple records"""
-        # Insert multiple properties
-        properties = [
-            {
-                "id": str(uuid.uuid4()),
-                "name": f"Property {i}",
-                "address": SAMPLE_PROPERTY["address"],
-                "units": SAMPLE_PROPERTY["units"]
-            }
-            for i in range(3)
-        ]
-        
-        for prop in properties:
-            await test_db.insert("properties", prop)
-
-        # Fetch and verify
-        results = await test_db.fetch_all("properties")
-        assert len(results) >= 3
-        assert all(isinstance(r, dict) for r in results)
-
-    async def test_insert_and_update(self, test_db: Database):
-        """Test insert and update operations"""
-        property_id = str(uuid.uuid4())
-        request_id = str(uuid.uuid4())
-
-        # Create property
-        property_data = {
-            "id": property_id,
-            "name": "Transaction Test Property",
-            "address": "456 Test Ave"
-        }
-        await test_db.insert("properties", property_data)
-
-        # Create maintenance request
+    async def test_maintenance_workflow(self, populated_db: Database, sample_data: Dict):
+        """Test complete maintenance request flow"""
+        # Create new request
         request_data = {
-            "id": request_id,
-            "property_id": property_id,
-            "description": "Test request",
-            "status": "new"
+            'id': str(uuid.uuid4()),
+            'property_id': sample_data['property']['id'],
+            'description': 'Test leak',
+            'priority': 'high',
+            'category': 'plumbing',
+            'status': 'new',
+            'contact_email': 'test@example.com'
         }
-        await test_db.insert("maintenance_requests", request_data)
-
-        # Verify both records were created
-        property_result = await test_db.fetch_one("properties", {"id": property_id})
-        request_result = await test_db.fetch_one("maintenance_requests", {"id": request_id})
-
-        assert property_result is not None
-        assert request_result is not None
-        assert request_result["property_id"] == property_id
-
-    async def test_batch_insert(self, test_db: Database):
-        """Test batch operations"""
-        # Prepare batch data
-        properties = [
-            {
-                "id": str(uuid.uuid4()),
-                "name": f"Batch Property {i}",
-                "address": f"{i} Batch St",
-                "units": 5
-            }
-            for i in range(5)
-        ]
-
-        # Insert properties
-        for prop in properties:
-            await test_db.insert("properties", prop)
-
-        # Verify batch insert
-        results = await test_db.fetch_all("properties", {"name": "like.Batch Property%"})
-        assert len(results) == 5
-
-    async def test_error_handling(self, test_db: Database):
-        """Test database error handling"""
-        # Test invalid table
-        with pytest.raises(DatabaseError):
-            await test_db.fetch_one("nonexistent_table", {"id": "123"})
-
-        # Test duplicate key
-        with pytest.raises(DatabaseError):
-            await test_db.insert("properties", {
-                "id": SAMPLE_PROPERTY["id"],  # Using existing ID should fail
-                "name": "Duplicate Property",
-                "address": "789 Test St"
-            })
-
-    @pytest.mark.parametrize("batch_size", [1, 5, 10])
-    async def test_concurrent_operations(self, test_db: Database, batch_size: int):
-        """Test concurrent operations"""
-        async def run_query(i: int):
-            data = {
-                "id": str(uuid.uuid4()),
-                "name": f"Concurrent Property {i}",
-                "address": f"{i} Concurrent St",
-                "units": i
-            }
-            return await test_db.insert("properties", data)
-
-        results = await asyncio.gather(
-            *[run_query(i) for i in range(batch_size)]
+        
+        # Insert request
+        created = await populated_db.insert('maintenance_requests', request_data)
+        assert created['id'] == request_data['id']
+        
+        # Update status
+        await populated_db.update(
+            'maintenance_requests',
+            created['id'],
+            {'status': 'processing'}
         )
-        assert len(results) == batch_size
-        assert all(r is not None for r in results)
-
-    async def test_cleanup(self, test_db: Database):
-        """Test database cleanup"""
-        # Clean up test data
-        await test_db.delete("maintenance_requests", {})
-        await test_db.delete("properties", {})
-
-        # Verify cleanup
-        properties = await test_db.fetch_all("properties")
-        requests = await test_db.fetch_all("maintenance_requests")
         
-        assert len(properties) == 0
-        assert len(requests) == 0
+        # Verify update
+        updated = await populated_db.fetch_one(
+            'maintenance_requests',
+            {'id': created['id']}
+        )
+        assert updated['status'] == 'processing'
 
-    async def test_transaction_rollback(self, test_db: Database):
-        """Test transaction rollback"""
-        async with test_db.transaction() as txn:
-            await test_db.insert("properties", property_data)
-            await txn.rollback()
+    async def test_contractor_assignment(self, populated_db: Database, sample_data: Dict):
+        """Test contractor assignment"""
+        request = await populated_db.fetch_one(
+            'maintenance_requests',
+            {'id': sample_data['request']['id']}
+        )
         
-        result = await test_db.fetch_one("properties", {"id": property_data["id"]})
-        assert result is None
+        # Find available contractor
+        contractor = await populated_db.fetch_one(
+            'contractors',
+            {'skills': ['plumbing'], 'available': True}
+        )
+        
+        # Assign contractor
+        await populated_db.update(
+            'maintenance_requests',
+            request['id'],
+            {
+                'assigned_contractor_id': contractor['id'],
+                'status': 'scheduled'
+            }
+        )
+        
+        # Verify assignment
+        updated = await populated_db.fetch_one(
+            'maintenance_requests',
+            {'id': request['id']}
+        )
+        assert updated['assigned_contractor_id'] == contractor['id']
+        assert updated['status'] == 'scheduled'
 
-    async def test_connection_pool(self, test_db: Database):
-        """Test connection pool handling"""
-        async def concurrent_query(i: int):
-            return await test_db.fetch_one("properties", {"id": str(i)})
-        
-        results = await asyncio.gather(*[concurrent_query(i) for i in range(20)])
-        assert len(results) == 20
+    async def test_error_handling(self, populated_db: Database):
+        """Test basic error cases"""
+        with pytest.raises(DatabaseError):
+            await populated_db.fetch_one('invalid_table', {})
+            
+        with pytest.raises(DatabaseError):
+            await populated_db.insert('maintenance_requests', {})

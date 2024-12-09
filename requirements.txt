@@ -1,17 +1,14 @@
-# Core Dependencies
+# Core
 streamlit>=1.31.0
 pydantic>=2.6.1
 pydantic-settings>=2.1.0
 python-dotenv>=1.0.0
 
 # Database
-asyncpg>=0.29.0
-sqlalchemy>=2.0.25
-alembic>=1.13.1
 postgrest>=0.13.1
 supabase>=2.3.4
 
-# AI and Machine Learning
+# AI
 langchain>=0.1.0
 langchain-openai>=0.0.8
 crewai>=0.14.1
@@ -21,54 +18,26 @@ openai>=1.12.0
 boto3>=1.34.14
 botocore>=1.34.14
 
-# Security and Data Processing
-python-jose>=3.3.0
-passlib>=1.7.4
-bcrypt>=4.1.2
+# Security
 bleach>=6.1.0
 
-# Testing
-pytest>=7.4.4
-pytest-asyncio>=0.23.3
-pytest-cov>=4.1.0
-aiohttp>=3.9.3
-
-# Async Support
+# Async
 asyncio>=3.4.3
 aiosmtplib>=2.0.2
-backoff>=2.2.1
+aiohttp>=3.9.3
 
 # Utilities
 pandas>=2.2.0
-numpy>=1.26.3
 python-dateutil>=2.8.2
-pytz>=2024.1
 email-validator>=2.1.0.post1
+requests>=2.31.0
+typing-extensions>=4.9.0
+python-multipart>=0.0.6
+httpx>=0.26.0
+pytest>=7.4.0
 
-# Development Tools
-black>=24.1.1
-isort>=5.13.2
-mypy>=1.8.0
-flake8>=7.0.0
-autopep8>=2.0.4
-
-# Logging and Monitoring
-structlog>=24.1.0
-python-json-logger>=2.0.7  # Updated from python-logging-json
-
-# Documentation
-mkdocs>=1.5.3
-mkdocs-material>=9.5.3
-
-# Optional: Development Environment
-ipython>=8.20.0
-jupyter>=1.0.0
-notebook>=7.0.7
-
-# Additional Dependencies Required by Optimized Code
-requests>=2.31.0  # Required for API calls
-typing-extensions>=4.9.0  # Better type hinting support
-python-multipart>=0.0.6  # Required for file uploads
-aiosqlite>=0.19.0  # Required for async SQLite support during testing
-httpx>=0.26.0  # Required for async HTTP requests
-jinja2>=3.1.3  # Required for template rendering
+# Additional Dependencies - keep essential
+requests>=2.31.0       # Needed for API calls
+typing-extensions>=4.9.0 # Needed for type hints
+python-multipart>=0.0.6 # Needed for file uploads
+httpx>=0.26.0          # Needed for async HTTP
