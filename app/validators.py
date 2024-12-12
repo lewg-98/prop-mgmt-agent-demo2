@@ -1,7 +1,9 @@
 from typing import Tuple, Dict, Optional, List
-import bleach
+import bleach # type: ignore
 from utils.logger import setup_logger
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, model_validator # type: ignore
+from datetime import datetime
+from enum import Enum
 
 # Configure logger
 logger = setup_logger("app.validators", log_file="logs/validation.log")
@@ -18,14 +20,21 @@ class MaintenanceRequestData(BaseModel):
     urgent: bool = Field(default=False)
     photo_urls: Optional[List[str]] = None
 
-    class Config:
-        """Configuration for validation messages"""
+    model_config = ConfigDict(
         error_msg_templates = {
             'value_error.missing': '⚠️ {field_name} is required',
             'value_error.any_str.min_length': '⚠️ Please provide more details about the issue',
             'value_error.any_str.max_length': '⚠️ Description is too long (max 1000 characters)',
             'value_error.email': '⚠️ Please provide a valid email address'
         }
+    )
+
+    @model_validator(mode='after')
+    def validate_urgent_phone(self) -> 'MaintenanceRequestData':
+        """Validate phone number is provided for urgent requests"""
+        if self.urgent and not self.phone:
+            raise ValueError("Phone number required for urgent requests")
+        return self
 
 class RequestValidator:
     """
@@ -70,7 +79,7 @@ class RequestValidator:
                 data['description'] = self.sanitize_input(data['description'])
             
             # Validate using Pydantic model
-            request_data = MaintenanceRequestData(**data)
+            request_data = MaintenanceRequestData.model_validate(data)
             
             # Demo-specific validations
             if request_data.urgent and not request_data.phone:

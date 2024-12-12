@@ -1,8 +1,14 @@
-import pytest
+import pytest # type: ignore
+import asyncio
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from unittest.mock import patch, MagicMock
+import logging
+
 from agent.crew import DomiCrew, RequestStatus, MaintenanceRequest
 from agent.tools import MaintenanceRequestError
+from app.config import Settings
+from app.database import Database
 
 class AgentError(Exception):
     """Base error for agent operations"""

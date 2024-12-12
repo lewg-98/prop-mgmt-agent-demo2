@@ -1,8 +1,11 @@
-import pytest
-from typing import Dict
+import pytest # type: ignore
+from typing import Dict, Any
 from datetime import datetime
 import uuid
+import logging
+from unittest.mock import patch, MagicMock
 from app.database import Database, DatabaseError
+from app.config import Settings
 
 @pytest.mark.asyncio
 class TestDatabase:

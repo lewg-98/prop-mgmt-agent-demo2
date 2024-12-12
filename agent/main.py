@@ -2,7 +2,7 @@ from typing import Dict, Optional, Any
 import asyncio
 import logging
 from datetime import datetime
-from pydantic import ValidationError
+from pydantic import ValidationError # type: ignore
 
 from .crew import DomiCrew, MaintenanceRequest, RequestStatus, CrewError
 from app.config import Settings, get_settings

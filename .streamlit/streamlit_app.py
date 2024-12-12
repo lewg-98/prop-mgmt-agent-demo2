@@ -1,7 +1,7 @@
-import streamlit as st
+import streamlit as st # type: ignore
 import asyncio
 from typing import Dict, Any
-import pandas as pd
+import pandas as pd # type: ignore
 from datetime import datetime
 import logging
 from app.config import get_settings

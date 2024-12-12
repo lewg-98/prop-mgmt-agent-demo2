@@ -2,16 +2,23 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 import logging
 from enum import Enum
-from pydantic import BaseModel, Field
-from crewai import Agent, Task, Crew, Process
-from langchain_openai import ChatOpenAI
-from app.database import Database
+from pydantic import BaseModel, Field, SecretStr # type: ignore
+from crewai import Agent, Task, Crew, Process # type: ignore
+from langchain_openai import ChatOpenAI # type: ignore
+from app.database import Database, DatabaseError
+from uuid import UUID
 
 from .tools import (
-    MAINTENANCE_TOOLS,
-    MaintenanceRequestError
+    BaseMaintenanceTool,
+    IssueClassificationTool,
+    MaintenanceRequestError,
+    ContractorBookingTool,
+    NotificationTool,
+    CostEstimationTool,
+    CompletionReportTool,
+    MAINTENANCE_TOOLS
 )
-from app.config import Settings
+from app.config import Settings, Environment
 from utils.logger import setup_logger
 
 # Configure logging
@@ -198,7 +205,8 @@ class DomiCrew:
             if not request:
                 raise MaintenanceRequestError("Request not found")
             
-            # No validation of request['description'], request['category'], etc.
+            # Get completion tool from MAINTENANCE_TOOLS
+            completion_tool = MAINTENANCE_TOOLS['completion_report']
             report = completion_tool.run(
                 description=request['description'],
                 category=request['category'],

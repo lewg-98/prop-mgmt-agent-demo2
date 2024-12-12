@@ -1,7 +1,7 @@
 from typing import Optional, BinaryIO, List, Dict, Any
-import boto3
+import boto3 # type: ignore
 from utils.logger import setup_logger
-from botocore.config import Config
+from botocore.config import Config # type: ignore
 from datetime import datetime
 from pathlib import Path
 from .config import Settings, get_settings

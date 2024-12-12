@@ -1,12 +1,14 @@
 import sys
 import os
-import pytest
+import pytest # type: ignore
 import asyncio
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import uuid
 import logging
 from datetime import datetime
+import boto3 # type: ignore
+from unittest.mock import patch, MagicMock
 
 # Add project root to path
 root_dir = Path(__file__).parent.parent

@@ -1,0 +1,12 @@
+2024-12-09 18:45:46 [ERROR] agent.crew: ❌ Agent initialization failed: 1 validation error for Agent
+tools
+  Value error, Invalid tool type: <class 'agent.tools.IssueClassificationTool'>. Tool must be an instance of BaseTool or an object with 'name', 'func', and 'description' attributes. [type=value_error, input_value=[IssueClassificationTool(...Basic supplies', 20)]})], input_type=list]
+    For further information visit https://errors.pydantic.dev/2.10/v/value_error
+2024-12-09 18:50:21 [ERROR] agent.crew: ❌ Agent initialization failed: 1 validation error for Agent
+tools
+  Value error, Invalid tool type: <class 'agent.tools.IssueClassificationTool'>. Tool must be an instance of BaseTool or an object with 'name', 'func', and 'description' attributes. [type=value_error, input_value=[IssueClassificationTool(...Basic supplies', 20)]})], input_type=list]
+    For further information visit https://errors.pydantic.dev/2.10/v/value_error
+2024-12-09 20:06:52 [ERROR] agent.crew: ❌ Agent initialization failed: 1 validation error for Agent
+tools
+  Value error, Invalid tool type: <class 'agent.tools.IssueClassificationTool'>. Tool must be an instance of BaseTool or an object with 'name', 'func', and 'description' attributes. [type=value_error, input_value=[IssueClassificationTool(...Basic supplies', 20)]})], input_type=list]
+    For further information visit https://errors.pydantic.dev/2.10/v/value_error

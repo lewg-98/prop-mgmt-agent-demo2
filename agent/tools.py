@@ -1,18 +1,18 @@
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 import logging
 from datetime import datetime, timedelta
+import json
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from langchain.tools import BaseTool
-from langchain_openai import ChatOpenAI
-from pydantic import BaseModel, Field
-import aiosmtplib
+from langchain.tools import BaseTool # type: ignore
+from langchain_openai import ChatOpenAI # type: ignore
+from pydantic import BaseModel, Field # type: ignore
+import aiosmtplib # type: ignore
 import asyncio
 import random
-from typing import Tuple
 
-from app.database import Database
-from app.config import get_settings
+from app.database import Database, DatabaseError
+from app.config import Settings, get_settings
 from utils.logger import setup_logger
 
 logger = setup_logger("agent.tools", log_file="logs/tools.log")
@@ -21,14 +21,17 @@ class MaintenanceRequestError(Exception):
     """Custom exception for maintenance requests"""
     pass
 
-class BaseMaintenanceTool(BaseTool, BaseModel):
+class BaseMaintenanceTool(BaseModel):
     """Base class for maintenance tools"""
     
-    ISSUE_CATEGORIES = ['plumbing', 'electrical', 'structural', 'appliance', 'hvac', 'other']
-    PRIORITY_LEVELS = ['urgent', 'high', 'medium', 'low']
+    ISSUE_CATEGORIES: List[str] = ['plumbing', 'electrical', 'structural', 'appliance', 'hvac', 'other']
+    PRIORITY_LEVELS: List[str] = ['urgent', 'high', 'medium', 'low']
     
-    settings: Any = Field(default_factory=get_settings)
-    db: Any = Field(default=None)
+    settings: Settings = Field(default_factory=get_settings)
+    db: Optional[Database] = Field(default=None)
+    
+    class Config:
+        arbitrary_types_allowed = True
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -37,9 +40,9 @@ class BaseMaintenanceTool(BaseTool, BaseModel):
 class IssueClassificationTool(BaseMaintenanceTool):
     """Analyzes maintenance issues"""
     
-    name: str = "issue_classification"
-    description: str = "Classify maintenance issues"
-    llm: Optional[ChatOpenAI] = None
+    name: str = Field(default="issue_classification")
+    description: str = Field(default="Classify maintenance issues")
+    llm: Optional[ChatOpenAI] = Field(default=None)
     
     async def _run(self, description: str) -> Dict[str, Any]:
         """Classify maintenance issue"""
@@ -69,11 +72,11 @@ class IssueClassificationTool(BaseMaintenanceTool):
 class ContractorBookingTool(BaseMaintenanceTool):
     """Books contractors for maintenance"""
     
-    name: str = "contractor_booking"
-    description: str = "Find and book contractors"
+    name: str = Field(default="contractor_booking")
+    description: str = Field(default="Find and book contractors")
     
     # MVP: Fixed scheduling based on priority
-    SCHEDULING_DEFAULTS = {
+    SCHEDULING_DEFAULTS: Dict[str, timedelta] = {
         'urgent': timedelta(hours=4),    # Within 4 hours
         'high': timedelta(days=1),       # Next day
         'medium': timedelta(days=3),     # Within 3 days
@@ -114,8 +117,8 @@ class ContractorBookingTool(BaseMaintenanceTool):
 class NotificationTool(BaseMaintenanceTool):
     """Sends notifications to stakeholders"""
     
-    name: str = "notification"
-    description: str = "Send maintenance notifications"
+    name: str = Field(default="notification")
+    description: str = Field(default="Send maintenance notifications")
     
     def _run(self, recipient: str, booking: Dict[str, Any], description: str) -> Dict[str, Any]:
         """Send simple notification email"""
@@ -165,11 +168,11 @@ class NotificationTool(BaseMaintenanceTool):
 class CostEstimationTool(BaseMaintenanceTool):
     """Estimates maintenance costs"""
     
-    name: str = "cost_estimation"
-    description: str = "Estimate maintenance costs"
+    name: str = Field(default="cost_estimation")
+    description: str = Field(default="Estimate maintenance costs")
     
     # MVP: Fixed costs per category
-    FIXED_COSTS = {
+    FIXED_COSTS: Dict[str, Dict[str, int]] = {
         'plumbing': {'base': 200, 'urgent': 300},
         'electrical': {'base': 250, 'urgent': 375},
         'structural': {'base': 500, 'urgent': 750},
@@ -194,18 +197,14 @@ class CostEstimationTool(BaseMaintenanceTool):
             logger.error(f"Cost estimation failed: {str(e)}")
             raise MaintenanceRequestError("Unable to estimate cost")
 
-
-
-# Add to existing tools.py - added job report generation tool. 
-
 class CompletionReportTool(BaseMaintenanceTool):
     """Tool for generating contextual completion reports"""
     
-    name: str = "completion_report"
-    description: str = "Generate maintenance completion reports"
+    name: str = Field(default="completion_report")
+    description: str = Field(default="Generate maintenance completion reports")
     
     # Standard labor rates for demo
-    LABOR_RATES = {
+    LABOR_RATES: Dict[str, int] = {
         'plumbing': 75,
         'electrical': 85,
         'hvac': 90,
@@ -214,7 +213,7 @@ class CompletionReportTool(BaseMaintenanceTool):
     }
     
     # Common parts and costs by category
-    COMMON_PARTS = {
+    COMMON_PARTS: Dict[str, List[Tuple[str, int]]] = {
         'plumbing': [
             ('Pipe fitting kit', 25),
             ('Sink gasket set', 15),
@@ -355,8 +354,6 @@ class CompletionReportTool(BaseMaintenanceTool):
             
         return round(base_hours, 1)
 
-
-
 # Initialize tools
 MAINTENANCE_TOOLS: Dict[str, BaseTool] = {}
 
@@ -375,8 +372,6 @@ def initialize_tools() -> Dict[str, BaseTool]:
     except Exception as e:
         logger.error(f"Tool initialization failed: {str(e)}")
         raise MaintenanceRequestError("Tool setup failed")
-
-
 
 def get_tool(tool_name: str) -> BaseTool:
     """Get tool instance"""

@@ -5,13 +5,16 @@ from datetime import datetime
 import sys
 from pathlib import Path
 import os
+import pytest # type: ignore
+from unittest.mock import patch
+import boto3 # type: ignore
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.config import Settings, get_settings
-from app.database import Database
+from app.database import Database, DatabaseError
 from app.s3 import S3Handler
-from agent.crew import DomiCrew
+from agent.crew import DomiCrew, MaintenanceRequest, RequestStatus
 
 # Configure logging
 logging.basicConfig(
@@ -51,7 +54,7 @@ async def check_s3() -> bool:
         s3 = S3Handler(get_settings())
         
         # Test listing bucket contents
-        await s3.list_files(prefix="test", max_items=1)
+        await s3.get_maintenance_photos("test-property")
         
         logger.info("✅ S3 connection successful")
         return True
@@ -107,7 +110,7 @@ async def check_configuration() -> Dict[str, bool]:
 async def check_system_resources() -> bool:
     """Check system resource availability"""
     try:
-        import psutil
+        import psutil # type: ignore
         memory = psutil.virtual_memory()
         cpu_percent = psutil.cpu_percent()
         

@@ -2,8 +2,13 @@
 
 from typing import Optional, Dict, Any, List
 import logging
-from supabase import Client, create_client
-from .config import Settings
+import asyncio
+from datetime import datetime
+from uuid import UUID
+from postgrest import PostgrestClient # type: ignore
+from supabase import Client, create_client # type: ignore
+from pydantic import SecretStr # type: ignore
+from .config import Settings, DatabaseConfig
 from utils.logger import setup_logger
 
 logger = setup_logger("app.database", log_file="logs/database.log")
@@ -24,13 +29,14 @@ class Database:
         self.supabase = None
         self._initialized = False
 
+
     async def initialize(self) -> None:
         """Set up database connection"""
         if not self._initialized:
             try:
                 self.supabase = create_client(
-                    self.settings.SUPABASE_URL,
-                    self.settings.SUPABASE_KEY.get_secret_value()
+                    self.settings.db.SUPABASE_URL,
+                    self.settings.db.SUPABASE_KEY.get_secret_value()
                 )
                 self._initialized = True
                 logger.info("Database connection initialized")

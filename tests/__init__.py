@@ -1,6 +1,6 @@
 from pathlib import Path
 import sys
-import pytest
+import pytest # type: ignore
 import asyncio
 from typing import AsyncGenerator, Generator
 import logging

@@ -1,15 +1,16 @@
-from typing import Optional, Dict, Any
-from enum import Enum
 from datetime import datetime, timedelta
-import logging
-import logging.config
+from enum import Enum
 from functools import lru_cache
 from pathlib import Path
+from typing import Any, Dict, Optional, Union
 
-from pydantic_settings import BaseSettings
-from pydantic import SecretStr, validator, Field
-from postgrest import PostgrestClient
-from supabase import create_client, Client
+from postgrest import PostgrestClient # type: ignore
+from pydantic import AnyHttpUrl, BaseModel, Field, SecretStr, validator # type: ignore
+from pydantic_settings import BaseSettings, SettingsConfigDict # type: ignore
+from supabase import Client, create_client # type: ignore
+
+import logging
+import logging.config
 from utils.logger import setup_logger
 
 class Environment(str, Enum):

@@ -1,8 +1,12 @@
+# Python Version
+python>=3.11.0
+
 # Core
 streamlit>=1.31.0
 pydantic>=2.6.1
 pydantic-settings>=2.1.0
 python-dotenv>=1.0.0
+
 
 # Database
 postgrest>=0.13.1
@@ -41,3 +45,7 @@ requests>=2.31.0       # Needed for API calls
 typing-extensions>=4.9.0 # Needed for type hints
 python-multipart>=0.0.6 # Needed for file uploads
 httpx>=0.26.0          # Needed for async HTTP
+
+# New Dependencies
+psutil>=5.9.0          # Used for system resource checks in quick_test.py
+pytest-asyncio>=0.20.3 # Used for async testing in test files

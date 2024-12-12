@@ -1,8 +1,11 @@
-import pytest
-from unittest.mock import patch
-import streamlit as st
+import pytest # type: ignore
+from unittest.mock import patch, MagicMock
+import streamlit as st # type: ignore
 from datetime import datetime
+from typing import Dict, Any
 from app.streamlit_app import DomiInterface
+from app.database import Database
+from app.config import Settings
 
 @pytest.fixture
 def mock_streamlit():
